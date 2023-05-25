@@ -1,53 +1,87 @@
 #!/usr/bin/env python3
 """
-Filtered Logger
+Personal data
 """
 
+
 import logging
+import os
 import re
+from typing import List
+import mysql.connector
+
+PII_FIELDS = ("name", "email", "phone", "ssn", "password")
+
+
+def filter_datum(fields: List[str], redaction: str, message: str,
+                 separator: str) -> str:
+    """ Replacing """
+    for f in fields:
+        message = re.sub(rf"{f}=(.*?)\{separator}",
+                         f'{f}={redaction}{separator}', message)
+    return message
 
 
 class RedactingFormatter(logging.Formatter):
-    """
-    Redacting Formatter class.
-
-    This formatter filters specified fields in log records
-    and replaces their values with a redaction string.
-    """
+    """ RedactingFormatter class. """
 
     REDACTION = "***"
     FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
     SEPARATOR = ";"
 
-    def __init__(self, fields):
-        super().__init__(self.FORMAT)
+    def __init__(self, fields: List[str]):
+        """ Init """
         self.fields = fields
+        super(RedactingFormatter, self).__init__(self.FORMAT)
 
     def format(self, record: logging.LogRecord) -> str:
-        """
-        Format the log record by filtering specified fields.
+        """ Format """
+        return filter_datum(self.fields, self.REDACTION,
+                            super().format(record), self.SEPARATOR)
 
-        Arguments:
-        - record: The log record to be formatted.
 
-        Returns:
-        - The formatted log message.
-        """
-        log_message = super().format(record)
-        log_message = self.filter_fields(log_message)
-        return log_message
+def get_logger() -> logging.Logger:
+    """ Implementing a logger.
+    """
 
-    def filter_fields(self, message):
-        """
-        Filter specified fields in the log message.
+    logger = logging.getLogger("user_data")
+    logger.setLevel(logging.INFO)
+    logger.propagate = False
+    handler = logging.StreamHandler()
+    handler.setFormatter(RedactingFormatter(PII_FIELDS))
+    logger.addHandler(handler)
+    return logger
 
-        Arguments:
-        - message: The log message to be filtered.
 
-        Returns:
-        - The filtered log message.
-        """
-        for field in self.fields:
-            pattern = field + r'=([^;]+)'
-            message = re.sub(pattern, field + '=' + self.REDACTION, message)
-        return message
+def get_db() -> mysql.connector.connection.MySQLConnection:
+    """ Implement db conectivity
+    """
+    psw = os.environ.get("PERSONAL_DATA_DB_PASSWORD", "")
+    username = os.environ.get('PERSONAL_DATA_DB_USERNAME', "root")
+    host = os.environ.get('PERSONAL_DATA_DB_HOST', 'localhost')
+    db_name = os.environ.get('PERSONAL_DATA_DB_NAME')
+    conn = mysql.connector.connect(
+        host=host,
+        database=db_name,
+        user=username,
+        password=psw)
+    return conn
+
+
+def main() -> None:
+    """ Implement a main function
+    """
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute("SELECT * FROM users;")
+    for row in cursor:
+        message = f"name={row[0]}; email={row[1]}; phone={row[2]}; " +\
+            f"ssn={row[3]}; password={row[4]};ip={row[5]}; " +\
+            f"last_login={row[6]}; user_agent={row[7]};"
+        print(message)
+    cursor.close()
+    db.close()
+
+
+if __name__ == '__main__':
+    main()
