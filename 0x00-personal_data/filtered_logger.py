@@ -25,5 +25,7 @@ def filter_datum(
     - The obfuscated log message
     """
     pattern = r'(' + '|'.join(fields) + r')=[^;]+'
-    return re.sub(pattern, lambda match: redaction if\
-match.group(1) in fields else match.group(0), message)
+    return re.sub(
+            pattern, lambda match: redaction if
+            match.group(1) in fields else match.group(0), message
+    )
