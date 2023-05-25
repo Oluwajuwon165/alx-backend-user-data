@@ -3,31 +3,51 @@
 Filtered Logger
 """
 
+import logging
 import re
-from typing import List
 
 
-def filter_datum(
-        fields: List[str], redaction: str,
-        message: str, separator: str
-) -> str:
+class RedactingFormatter(logging.Formatter):
     """
-    Replaces occurrences of certain field values
-    in the log message with redaction.
+    Redacting Formatter class.
 
-    Arguments:
-    - fields: a list of strings representing all fields to obfuscate
-    - redaction: a string representing by what
-    the field will be obfuscated
-    - message: a string representing the log line
-    - separator: a string representing by which character
-    is separating all fields in the log line (message)
-
-    Returns:
-    - The obfuscated log message
+    This formatter filters specified fields in log records
+    and replaces their values with a redaction string.
     """
-    pattern = r'(' + '|'.join(fields) + r')=[^;]+'
-    return re.sub(
-            pattern, lambda match: redaction if match.group(1)
-            in fields else match.group(0), message
-    )
+
+    REDACTION = "***"
+    FORMAT = "[HOLBERTON] %(name)s %(levelname)s %(asctime)-15s: %(message)s"
+    SEPARATOR = ";"
+
+    def __init__(self, fields):
+        super().__init__(self.FORMAT)
+        self.fields = fields
+
+    def format(self, record: logging.LogRecord) -> str:
+        """
+        Format the log record by filtering specified fields.
+
+        Arguments:
+        - record: The log record to be formatted.
+
+        Returns:
+        - The formatted log message.
+        """
+        log_message = super().format(record)
+        log_message = self.filter_fields(log_message)
+        return log_message
+
+    def filter_fields(self, message):
+        """
+        Filter specified fields in the log message.
+
+        Arguments:
+        - message: The log message to be filtered.
+
+        Returns:
+        - The filtered log message.
+        """
+        for field in self.fields:
+            pattern = field + r'=([^;]+)'
+            message = re.sub(pattern, field + '=' + self.REDACTION, message)
+        return message
